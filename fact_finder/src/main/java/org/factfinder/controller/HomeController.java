@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 /**
  * Handles requests for the application home page.
  */
@@ -52,11 +55,21 @@ public class HomeController {
 		MinuteVO[] resultClasses = restTemplate.getForObject("http://localhost:8080/controller/politic/minutes", MinuteVO[].class); 
 		List<MinuteVO> list = Arrays.asList(resultClasses);
 
+		String json = null;
 		
+		
+		try {
+			json = new ObjectMapper().writeValueAsString(list);
+		} catch (JsonProcessingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}	
+
+
 		String formattedDate = dateFormat.format(date);
 		
 		model.addAttribute("serverTime", formattedDate );
-		model.addAttribute("list",list);
+		model.addAttribute("json",json);
 		return "listPerAgenda";
 	}	
 	
