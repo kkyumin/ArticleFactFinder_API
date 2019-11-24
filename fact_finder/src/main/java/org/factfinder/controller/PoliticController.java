@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 
 import org.apache.http.HttpHost;
 import org.apache.http.util.EntityUtils;
+import org.apache.lucene.search.join.ScoreMode;
 import org.elasticsearch.action.admin.indices.get.GetIndexRequest;
 import org.elasticsearch.action.admin.indices.get.GetIndexResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -23,6 +24,7 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.index.query.InnerHitBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
@@ -152,11 +154,12 @@ public class PoliticController {
 
 	        SearchHits searchHits = searchResponse.getHits();
 	        Map<String, Object> idAsMap= new HashMap<>();
-	        
+	        ArrayList<String> stringList = new ArrayList<String>();
 	        
 	        for(SearchHit hit: searchHits) {
-	        	idAsMap.put("_id",hit.getId());
+	        	stringList.add(hit.getId());
 	        }	
+	        idAsMap.put("time",stringList);
 //            Response response = client.getLowLevelClient().performRequest(request);
 //	        String temp =  EntityUtils.toString(response.getEntity());
 	        String json = new ObjectMapper().writeValueAsString(idAsMap);
@@ -236,45 +239,51 @@ public class PoliticController {
        return json;
 	}
 
-//	@GetMapping(value = "/document/{name}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
-//	public String documenSearchbyName(@PathVariable("name") String name){
-//		String INDEX_NAME = "*round_plenary_session";
-//        //문서 타입
-//	  	String TYPE_NAME ="_doc";
-//	   String FIELD_NAME = "dialogue.discussion";
-//       SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
-// 
-//       SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-//       
+	//아직 미완성 : 이 부분은 키워드 검색과 거의 유사. 따라서 보여주는 범위만 달리해주면 될 듯 함  
+	@GetMapping(value = "/document/{name}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	public String documenSearchbyName(@PathVariable("name") String name){
+		String INDEX_NAME = "*round_plenary_session";
+        //문서 타입
+	  	String TYPE_NAME ="_doc";
+	   String FIELD_NAME = "dialogue.discussion";
+       SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+ 
+       SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+       
 //       searchSourceBuilder.query(QueryBuilders.matchQuery(FIELD_NAME, name));
-//   
-//       QueryBuilders.
-//       searchRequest.source(searchSourceBuilder);
+   
+       
+       InnerHitBuilder innerHitBuilder = new InnerHitBuilder();
+       
+       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().must(QueryBuilders.matchQuery(FIELD_NAME, name)), ScoreMode.Avg).innerHit(innerHitBuilder));
+         
+       searchRequest.source(searchSourceBuilder);
+       System.out.println(searchRequest.source().toString());
+
+        SearchResponse searchResponse = null;
+       try(RestHighLevelClient client = createConnection();){
+           searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
+//           System.out.println(searchResponse.toString());
+       }catch (Exception e) {
+           // TODO: handle exception
+           e.printStackTrace();
+           return null;
+      }    
+
+       String json =null;
 //
-//        SearchResponse searchResponse;
-//       try(RestHighLevelClient client = createConnection();){
-//           searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
-//       }catch (Exception e) {
-//           // TODO: handle exception
-//           e.printStackTrace();
-//           return null;
-//      }    	
-////       	Request request = new Request("GET", INDEX_NAME);
-//          
-//       		
-//	        SearchHits searchHits = searchResponse.getHits();
-//	        Map<String, Object> idAsMap= new HashMap<>();
-//	        
-//	        
-//	        for(SearchHit hit: searchHits) {
-//	        	idAsMap.put("_id",hit.getId());
-//	        }	
-//
-//	        String json = new ObjectMapper().writeValueAsString(idAsMap);
-//	   return json;
-//       
-//	}
-	
+       Map<String, Object> map= new HashMap<String,Object>();
+
+	   SearchHits searchHits = searchResponse.getHits();
+	   
+	   // 아직 안하는 중
+	   for(SearchHit hit: searchHits) {
+        	hit = hit;
+	   }	   
+   	   return json;
+       
+	}
+//	
 	
 //	@GetMapping(value = "/congressMember/{oid}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
 //	public String documentCountInMinute(@PathVariable("oid") String oid){
