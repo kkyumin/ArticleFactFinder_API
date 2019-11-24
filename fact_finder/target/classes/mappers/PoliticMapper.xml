@@ -11,7 +11,7 @@
 <select id = "getAgenda" resultType = "org.factfinder.vo.AgendaVO">
 	select mid,aid,aname,anumber from agenda where mid = #{mid} order by anumber
 </select>
-<select id = "getAgenda" resultType = "org.factfinder.vo.DialogueVO">
+<select id = "getDialogue" resultType = "org.factfinder.vo.DialogueVO">
 	select aid,did,membername,memberspeech from dialogue where aid = #{aid} order by did
 </select>
 </mapper>

@@ -16,5 +16,5 @@ public interface PoliticService {
 	public List<MinuteVO> getAllMinutes();
 	public List<AgendaVO> getAgenda(int mid);
 	public List<DialogueVO> getDialogue(int aid);
-	public List<VO> getDialougeByPerson(String membername);
+//	public List<VO> getDialougeByPerson(String membername);
 }
