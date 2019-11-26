@@ -311,6 +311,7 @@ public class PoliticController {
     		   Map<String,Object> sourceMap = new HashMap<String,Object>();
     		   sourceMap.put("round",round);
     		   sourceMap.put("time",time);  
+    		   
     		   sourceMap.put("meeting_type",meetingType);
     		   sourceMap.put("source",source);   
     		   resultArray.add(sourceMap);
