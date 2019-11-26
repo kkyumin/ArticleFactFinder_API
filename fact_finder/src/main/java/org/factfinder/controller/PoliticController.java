@@ -226,11 +226,26 @@ public class PoliticController {
     	   sourceAsMap = response.getSourceAsMap();
        }
        Object memberListBeforeSort= sourceAsMap.get("member_info_list");
-       ArrayList<String> memberListAfterSort = (ArrayList<String>) memberListBeforeSort;
-       Collections.sort(memberListAfterSort);
+       ArrayList<String> memberList = (ArrayList<String>) memberListBeforeSort;
+       Collections.sort(memberList);
+       
+       ArrayList<Map<String,Object>> resultList = new ArrayList<Map<String,Object>>();
+       for(int i=0; i<memberList.size();i++) {
+    	   String[] tmp = memberList.get(i).split(" ");
+    	   String name = tmp[0];
+    	   String party = tmp[1];
+    	   
+    	   Map<String,Object> nameMap = new HashMap<String, Object>();       
+
+    	   nameMap.put("name", name);
+    	   nameMap.put("party", party);
+    	   resultList.add(nameMap);
+       }
+       
+
        
        Map<String,Object> sourceAsMap2 = new HashMap<String, Object>();
-       sourceAsMap2.put("member_info_list", memberListAfterSort);
+       sourceAsMap2.put("member_info_list", resultList);
        try {
        json = new ObjectMapper().writeValueAsString(sourceAsMap2);
      
@@ -255,7 +270,7 @@ public class PoliticController {
        
        InnerHitBuilder innerHitBuilder = new InnerHitBuilder();
        
-       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().must(QueryBuilders.matchQuery(FIELD_NAME, name)), ScoreMode.Avg).innerHit(innerHitBuilder));
+       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().must(QueryBuilders.matchQuery(FIELD_NAME, name)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
          
        searchRequest.source(searchSourceBuilder);
        System.out.println(searchRequest.source().toString());
@@ -263,6 +278,7 @@ public class PoliticController {
         SearchResponse searchResponse = null;
        try(RestHighLevelClient client = createConnection();){
            searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
+           
 //           System.out.println(searchResponse.toString());
        }catch (Exception e) {
            // TODO: handle exception
@@ -272,14 +288,43 @@ public class PoliticController {
 
        String json =null;
 //
-       Map<String, Object> map= new HashMap<String,Object>();
+       Map<String, SearchHits> map= new HashMap<String,SearchHits>();
 
+       ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
+  
 	   SearchHits searchHits = searchResponse.getHits();
-	   
+	   ObjectMapper oMapper = new ObjectMapper();
 	   // 아직 안하는 중
-	   for(SearchHit hit: searchHits) {
-        	hit = hit;
-	   }	   
+
+       
+       for(SearchHit hit: searchHits) {
+    	   map = hit.getInnerHits();
+    	   SearchHits tmp = map.get("dialogue");
+    	   for (SearchHit hittmp : tmp) {
+    		   String index = hittmp.getIndex();
+    		   String[] temp = index.split("th_")[1].split("round_");
+    		   String round = temp[0];
+    		   String meetingType = temp[1];
+    		   String time = hittmp.getId();
+    		   Map<String,Object> source = hittmp.getSourceAsMap();
+    		   
+    		   Map<String,Object> sourceMap = new HashMap<String,Object>();
+    		   sourceMap.put("round",round);
+    		   sourceMap.put("time",time);  
+    		   sourceMap.put("meeting_type",meetingType);
+    		   sourceMap.put("source",source);   
+    		   resultArray.add(sourceMap);
+    		   
+    	   }
+       }	
+       
+       Map<String,Object> resultMap = new HashMap<String,Object>();
+       resultMap.put("result", resultArray);
+	   try{
+		   json = new ObjectMapper().writeValueAsString(resultMap);
+       }catch(Exception e) {
+       }
+      
    	   return json;
        
 	}
