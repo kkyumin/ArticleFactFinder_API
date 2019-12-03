@@ -131,7 +131,96 @@ public class PoliticController {
 	        }
 	        return null;
 	}
+
+	
+	@GetMapping(value = "/meetingInfo")
+	public String getMeetingInfo(){
+	  	String INDEX_NAME = "*_plenary_session";
+	
+        RestHighLevelClient client = null;
+        try {
+        	client = createConnection();
+        	
+//        	Request request = new Request("GET", INDEX_NAME);
+           
+        	SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+        	
+            SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+            searchSourceBuilder.fetchSource(false);
+            searchRequest.source(searchSourceBuilder);
+	        SearchResponse searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
+
+	        SearchHits searchHits = searchResponse.getHits();
+
+	        ArrayList<String> stringList = new ArrayList<String>();
+	        String round = null;
+	        String roundText = null;
+	        String prevRoundText = null;
+	        ArrayList<Map<String,Object>> dialogueList = new ArrayList<Map<String,Object>>();
+			Map<String, Object> resultMap= new HashMap<>();
 			
+			
+			
+			ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
+			ArrayList<Map<String,Object>> idArray = new ArrayList<Map<String,Object>>();
+	        int id;
+	        String idText;
+	        String prevRound= null;
+	        String temp =null;
+	        for(SearchHit hit: searchHits) {
+	        	
+	        	int flag = 0;
+	        	
+	        	temp =hit.getIndex().split("_")[1].split("round")[0];
+	        	if(!temp.equals(round)){
+	        		prevRound = round;
+	        		round = temp;
+	        		prevRoundText = prevRound+"round";
+					flag = 1;
+	        	}
+	        	
+				if(flag ==1) {
+					ArrayList<Object> tempIdArray= (ArrayList<Object>) idArray.clone();
+					idArray.clear();
+					Map<String,Object> roundMap = new HashMap<String,Object>();
+					roundMap.put("round",prevRound);
+					roundMap.put("text",prevRoundText);
+					roundMap.put("dialogue", tempIdArray);
+					resultArray.add(roundMap);
+				}	
+	        	Map<String,Object> idMap = new HashMap<String,Object>();
+				
+	        	id = Integer.parseInt(hit.getId());
+				idText= hit.getId()+"time";	        		        	
+				idMap.put("time", id);
+				idMap.put("text", idText);
+				idArray.add(idMap);
+			}
+
+	    	ArrayList<Object> tempIdArray= (ArrayList<Object>) idArray.clone();
+			idArray.clear();
+			Map<String,Object> roundMap = new HashMap<String,Object>();
+			roundMap.put("round",round);
+			roundMap.put("text",round+"round");
+			roundMap.put("dialogue", tempIdArray);
+			resultArray.add(roundMap);
+			
+			resultArray.remove(0);
+//            Response response = client.getLowLevelClient().performRequest(request);
+//	        String temp =  EntityUtils.toString(response.getEntity());
+	        String json = new ObjectMapper().writeValueAsString(resultArray);
+	        return json;
+        }catch(Exception e){	
+        }finally {	 	        
+        	try{
+        		client.close();
+        	}catch(IOException ie) {
+        	} 
+        }
+        return null;
+	}
+
+	
 	@GetMapping(value = "/{rid}/round")
 	public String documentCountInMinute(@PathVariable("rid") int rid ){
 	  	String INDEX_NAME = "*_"+rid+"round_plenary_session";
