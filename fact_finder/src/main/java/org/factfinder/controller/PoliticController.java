@@ -38,9 +38,11 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +54,7 @@ import lombok.extern.log4j.Log4j2;
 @RestController
 @Log4j2
 @AllArgsConstructor
+@CrossOrigin(origins = "*")
 public class PoliticController {
 	
 	PoliticService service;
@@ -133,10 +136,10 @@ public class PoliticController {
 	}
 
 	
-	@GetMapping(value = "/meetingInfo")
-	public String getMeetingInfo(){
-	  	String INDEX_NAME = "*_plenary_session";
-	
+	@RequestMapping(value = "/meetingInfo", produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	public String getMeetingInfo(@RequestParam("ordinal") int ordinal){
+		String INDEX_NAME = ordinal+"th_*round_plenary_session";
+		
         RestHighLevelClient client = null;
         try {
         	client = createConnection();
@@ -175,7 +178,7 @@ public class PoliticController {
 	        	if(!temp.equals(round)){
 	        		prevRound = round;
 	        		round = temp;
-	        		prevRoundText = prevRound+"round";
+	        		prevRoundText = prevRound+"회";
 					flag = 1;
 	        	}
 	        	
@@ -191,7 +194,7 @@ public class PoliticController {
 	        	Map<String,Object> idMap = new HashMap<String,Object>();
 				
 	        	id = Integer.parseInt(hit.getId());
-				idText= hit.getId()+"time";	        		        	
+				idText= hit.getId()+"차";	        		        	
 				idMap.put("time", id);
 				idMap.put("text", idText);
 				idArray.add(idMap);
@@ -200,8 +203,8 @@ public class PoliticController {
 	    	ArrayList<Object> tempIdArray= (ArrayList<Object>) idArray.clone();
 			idArray.clear();
 			Map<String,Object> roundMap = new HashMap<String,Object>();
-			roundMap.put("round",round);
-			roundMap.put("text",round+"round");
+			roundMap.put("round",Integer.parseInt(round));
+			roundMap.put("text",round+"회");
 			roundMap.put("dialogue", tempIdArray);
 			resultArray.add(roundMap);
 			
@@ -264,13 +267,15 @@ public class PoliticController {
 	}
 	
 
-	@GetMapping(value = "/{oid}/ordinal/{rid}/round/{tid}/time" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
-	public String dialogueInTime(@PathVariable("oid") String oid,@PathVariable("rid") String rid, @PathVariable("tid") String tid ){
+	
+//	@GetMapping(value = "/{oid}/ordinal/{rid}/round/{tid}/time" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	@RequestMapping(value = "/dialogueInTime", produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	public String dialogueInTime(@RequestParam("ordinal") int oid,@RequestParam("round") int rid, @RequestParam("time") int tid ){
 		String INDEX_NAME = oid+"th_"+rid+"round_plenary_session";
         //문서 타입
 	  	String TYPE_NAME ="_doc";
 	  	
-        GetRequest request = new GetRequest(INDEX_NAME,TYPE_NAME,tid);
+        GetRequest request = new GetRequest(INDEX_NAME,TYPE_NAME,Integer.toString(tid));
         GetResponse response = null;
        try(RestHighLevelClient client = createConnection();){
             response = client.get(request, RequestOptions.DEFAULT);
@@ -291,8 +296,9 @@ public class PoliticController {
        return json;
 	}
 	
-	@GetMapping(value = "/congressMember/{oid}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
-	public String documentCountInMinute(@PathVariable("oid") String oid){
+//	@GetMapping(value = "/congressMember/{oid}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	@RequestMapping(value = "/congressMember", produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	public String documentCountInMinute(@RequestParam("ordinal") String oid){
 		String INDEX_NAME = "congress_member_list";
         //문서 타입
 	  	String TYPE_NAME ="_doc";
@@ -344,8 +350,8 @@ public class PoliticController {
 	}
 
 	//아직 미완성 : 이 부분은 키워드 검색과 거의 유사. 따라서 보여주는 범위만 달리해주면 될 듯 함  
-	@GetMapping(value = "/document/{name}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
-	public String documenSearchbyName(@PathVariable("name") String name){
+	@RequestMapping(value = "/searchByName"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	public String documenSearchbyName(@RequestParam("name") String name){
 		String INDEX_NAME = "*round_plenary_session";
         //문서 타입
 	  	String TYPE_NAME ="_doc";
@@ -398,8 +404,8 @@ public class PoliticController {
     		   Map<String,Object> source = hittmp.getSourceAsMap();
     		   
     		   Map<String,Object> sourceMap = new HashMap<String,Object>();
-    		   sourceMap.put("round",round);
-    		   sourceMap.put("time",time);  
+    		   sourceMap.put("round",Integer.parseInt(round));
+    		   sourceMap.put("time",Integer.parseInt(time));  
     		   
     		   sourceMap.put("meeting_type",meetingType);
     		   sourceMap.put("source",source);   
@@ -418,7 +424,84 @@ public class PoliticController {
    	   return json;
        
 	}
-//	
+
+	
+	//아직 미완성 : 이 부분은 키워드 검색과 거의 유사. 따라서 보여주는 범위만 달리해주면 될 듯 함  
+	@RequestMapping(value = "/searchByKeyword"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+	public String documenSearchbyKeyword(@RequestParam("keyword") String keyword){
+		String INDEX_NAME = "*round_plenary_session";
+        //문서 타입
+	  	String TYPE_NAME ="_doc";
+	   String FIELD_NAME = "dialogue.discussion";
+       SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+ 
+       SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+       
+//       searchSourceBuilder.query(QueryBuilders.matchQuery(FIELD_NAME, name));
+   
+       
+       InnerHitBuilder innerHitBuilder = new InnerHitBuilder();
+       
+       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().must(QueryBuilders.matchQuery(FIELD_NAME, keyword)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
+         
+       searchRequest.source(searchSourceBuilder);
+       System.out.println(searchRequest.source().toString());
+
+        SearchResponse searchResponse = null;
+       try(RestHighLevelClient client = createConnection();){
+           searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
+           
+//           System.out.println(searchResponse.toString());
+       }catch (Exception e) {
+           // TODO: handle exception
+           e.printStackTrace();
+           return null;
+      }    
+
+       String json =null;
+//
+       Map<String, SearchHits> map= new HashMap<String,SearchHits>();
+
+       ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
+  
+	   SearchHits searchHits = searchResponse.getHits();
+	   ObjectMapper oMapper = new ObjectMapper();
+	   // 아직 안하는 중
+
+       
+       for(SearchHit hit: searchHits) {
+    	   map = hit.getInnerHits();
+    	   SearchHits tmp = map.get("dialogue");
+    	   for (SearchHit hittmp : tmp) {
+    		   String index = hittmp.getIndex();
+    		   String[] temp = index.split("th_")[1].split("round_");
+    		   String round = temp[0];
+    		   String meetingType = temp[1];
+    		   String time = hittmp.getId();
+    		   Map<String,Object> source = hittmp.getSourceAsMap();
+    		   
+    		   Map<String,Object> sourceMap = new HashMap<String,Object>();
+    		   sourceMap.put("round",Integer.parseInt(round));
+    		   sourceMap.put("time",Integer.parseInt(time));  
+    		   
+    		   sourceMap.put("meeting_type",meetingType);
+    		   sourceMap.put("source",source);   
+    		   resultArray.add(sourceMap);
+    		   
+    	   }
+       }	
+       
+       Map<String,Object> resultMap = new HashMap<String,Object>();
+       resultMap.put("result", resultArray);
+	   try{
+		   json = new ObjectMapper().writeValueAsString(resultMap);
+       }catch(Exception e) {
+       }
+      
+   	   return json;
+       
+	}
+	//	
 	
 //	@GetMapping(value = "/congressMember/{oid}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
 //	public String documentCountInMinute(@PathVariable("oid") String oid){
