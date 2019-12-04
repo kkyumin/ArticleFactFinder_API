@@ -143,26 +143,22 @@ public class PoliticController {
         RestHighLevelClient client = null;
         try {
         	client = createConnection();
-        	
-//        	Request request = new Request("GET", INDEX_NAME);
            
         	SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
-        	
+        		
             SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
             searchSourceBuilder.fetchSource(false);
             searchRequest.source(searchSourceBuilder);
 	        SearchResponse searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
-
+	        
 	        SearchHits searchHits = searchResponse.getHits();
-
+	        
 	        ArrayList<String> stringList = new ArrayList<String>();
 	        String round = null;
 	        String roundText = null;
 	        String prevRoundText = null;
 	        ArrayList<Map<String,Object>> dialogueList = new ArrayList<Map<String,Object>>();
 			Map<String, Object> resultMap= new HashMap<>();
-			
-			
 			
 			ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
 			ArrayList<Map<String,Object>> idArray = new ArrayList<Map<String,Object>>();
@@ -243,11 +239,11 @@ public class PoliticController {
             searchSourceBuilder.fetchSource(includeFields, null);
 	        searchRequest.source(searchSourceBuilder);
 	        SearchResponse searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
-
+	        
 	        SearchHits searchHits = searchResponse.getHits();
 	        Map<String, Object> idAsMap= new HashMap<>();
 	        ArrayList<String> stringList = new ArrayList<String>();
-	        
+
 	        for(SearchHit hit: searchHits) {
 	        	stringList.add(hit.getId());
 	        }	
@@ -269,35 +265,85 @@ public class PoliticController {
 
 	
 //	@GetMapping(value = "/{oid}/ordinal/{rid}/round/{tid}/time" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+//	@RequestMapping(value = "/dialogueInTime", produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+//	public String dialogueInTime(@RequestParam("round") int rid, @RequestParam("time") int tid,@RequestParam("meeting_type") String meeting_type){
+//		String INDEX_NAME = "*"+rid+"round_"+meeting_type;
+//        //문서 타입
+//	  	String TYPE_NAME ="_doc";
+//	  	
+//
+//	  	
+//        GetRequest request = new GetRequest(INDEX_NAME,TYPE_NAME,Integer.toString(tid));
+//        GetResponse response = null;
+//       try(RestHighLevelClient client = createConnection();){
+//            response = client.get(request, RequestOptions.DEFAULT);
+//        }catch (Exception e) {
+//            // TODO: handle exception
+//            e.printStackTrace();
+//            return null;
+//        }
+//       Map<String, Object> sourceAsMap = null;
+//       if(response.isExists()) {
+//           sourceAsMap = response.getSourceAsMap();
+//       }
+//       String json = null;
+//       try {
+//       json = new ObjectMapper().writeValueAsString(sourceAsMap);
+//       }catch(Exception e) {
+//       }
+//       return json;
+//	}
+
 	@RequestMapping(value = "/dialogueInTime", produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
-	public String dialogueInTime(@RequestParam("ordinal") int oid,@RequestParam("round") int rid, @RequestParam("time") int tid ){
-		String INDEX_NAME = oid+"th_"+rid+"round_plenary_session";
+	public String dialogueInTime(@RequestParam("round") int rid, @RequestParam("time") int tid,@RequestParam("meeting_type") String meeting_type){
+		String INDEX_NAME = "*_"+rid+"round_"+meeting_type;
         //문서 타입
 	  	String TYPE_NAME ="_doc";
 	  	
-        GetRequest request = new GetRequest(INDEX_NAME,TYPE_NAME,Integer.toString(tid));
-        GetResponse response = null;
+	       SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+	       
+	       SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+	       
+	       
+	       searchSourceBuilder.query(QueryBuilders.idsQuery("_doc").addIds(Integer.toString(tid)));
+	         
+	       searchRequest.source(searchSourceBuilder);
+	       System.out.println(searchRequest.source().toString());
+
+	       SearchResponse searchResponse = null;
        try(RestHighLevelClient client = createConnection();){
-            response = client.get(request, RequestOptions.DEFAULT);
+           searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
         }catch (Exception e) {
             // TODO: handle exception
             e.printStackTrace();
             return null;
         }
-       Map<String, Object> sourceAsMap = null;
-       if(response.isExists()) {
-           sourceAsMap = response.getSourceAsMap();
-       }
-       String json = null;
-       try {
-       json = new ObjectMapper().writeValueAsString(sourceAsMap);
+       String json =null;
+//
+       
+  
+	   SearchHits searchHits = searchResponse.getHits();
+
+	   // 아직 안하는 중
+
+	    Map<String,Object> resultMap = new HashMap<String,Object>();
+	        
+       for(SearchHit hit: searchHits) {
+    	   resultMap = hit.getSourceAsMap();
+       }	
+       
+       ;
+	   try{
+		   json = new ObjectMapper().writeValueAsString(resultMap);
        }catch(Exception e) {
        }
-       return json;
+      
+   	   return json;
 	}
+
 	
-//	@GetMapping(value = "/congressMember/{oid}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
 	@RequestMapping(value = "/congressMember", produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+//	@GetMapping(value = "/congressMember/{oid}" , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
 	public String documentCountInMinute(@RequestParam("ordinal") String oid){
 		String INDEX_NAME = "congress_member_list";
         //문서 타입
@@ -306,6 +352,9 @@ public class PoliticController {
        GetResponse response = null;
      
 
+       if(oid == null)
+    	   return null;
+       
        try(RestHighLevelClient client = createConnection();){
             response = client.get(request, RequestOptions.DEFAULT);
         }catch (Exception e) {

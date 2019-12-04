@@ -43,61 +43,37 @@ public class HomeController {
 //		return "home";
 //	}
 
-	@RequestMapping(value = "/", method = RequestMethod.GET)
-	public String listMinute(Locale locale, Model model) {
-		logger.info("Page for Looking List per Agenda", locale);
-		
-		RestTemplate restTemplate = new RestTemplate();
-		Date date = new Date();
-		DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.LONG, locale);
-
-		//Mapping Problem When get by List
-		MinuteVO[] resultClasses = restTemplate.getForObject(domain+"/controller/politic/minutes", MinuteVO[].class); 
-		List<MinuteVO> list = Arrays.asList(resultClasses);
-
-		String json = null;
-		
-		
-		try {
-			json = new ObjectMapper().writeValueAsString(list);
-		} catch (JsonProcessingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}	
-
-		String formattedDate = dateFormat.format(date);
-		
-		model.addAttribute("serverTime", formattedDate );
-		model.addAttribute("json",json);
-		return "listPerAgenda";
-	}	
+//	@RequestMapping(value = "/", method = RequestMethod.GET)
+//	public String listMinute(Locale locale, Model model) {
+////		logger.info("Page for Looking List per Agenda", locale);
+////		
+////		RestTemplate restTemplate = new RestTemplate();
+////		Date date = new Date();
+////		DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.LONG, locale);
+////
+////		//Mapping Problem When get by List
+////		MinuteVO[] resultClasses = restTemplate.getForObject(domain+"/controller/politic/minutes", MinuteVO[].class); 
+////		List<MinuteVO> list = Arrays.asList(resultClasses);
+////
+////		String json = null;
+////		
+////		
+////		try {
+////			json = new ObjectMapper().writeValueAsString(list);
+////		} catch (JsonProcessingException e) {
+////			// TODO Auto-generated catch block
+////			e.printStackTrace();
+////		}	
+////
+////		String formattedDate = dateFormat.format(date);
+////		
+////		model.addAttribute("serverTime", formattedDate );
+////		model.addAttribute("json",json);
+//		return "listPerAgenda";
+//	}	
 
 	@RequestMapping(value = "/minutes/{id}", method = RequestMethod.GET)
 	public String agendaPerMinute(Locale locale, Model model) {
-		logger.info("Page for Looking List per Agenda", locale);
-		
-		RestTemplate restTemplate = new RestTemplate();
-		Date date = new Date();
-		DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.LONG, locale);
-
-		//Mapping Problem When get by List
-		MinuteVO[] resultClasses = restTemplate.getForObject(domain+"/controller/politic/minutes", MinuteVO[].class); 
-		List<MinuteVO> list = Arrays.asList(resultClasses);
-
-		String json = null;
-		
-		
-		try {
-			json = new ObjectMapper().writeValueAsString(list);
-		} catch (JsonProcessingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}	
-
-		String formattedDate = dateFormat.format(date);
-		
-		model.addAttribute("serverTime", formattedDate );
-		model.addAttribute("json",json);
 		return "listPerAgenda";
 	}
 	
