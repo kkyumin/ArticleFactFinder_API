@@ -365,7 +365,7 @@ public class PoliticController {
        
        InnerHitBuilder innerHitBuilder = new InnerHitBuilder();
        
-       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().must(QueryBuilders.matchQuery(FIELD_NAME, name)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
+       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().should(QueryBuilders.matchQuery(FIELD_NAME, name)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
          
        searchRequest.source(searchSourceBuilder);
        System.out.println(searchRequest.source().toString());
@@ -396,6 +396,9 @@ public class PoliticController {
     	   map = hit.getInnerHits();
     	   SearchHits tmp = map.get("dialogue");
     	   for (SearchHit hittmp : tmp) {
+    		   if(hittmp.getScore() <1) {
+    			   continue;
+    		   }
     		   String index = hittmp.getIndex();
     		   String[] temp = index.split("th_")[1].split("round_");
     		   String round = temp[0];
@@ -439,10 +442,13 @@ public class PoliticController {
        
 //       searchSourceBuilder.query(QueryBuilders.matchQuery(FIELD_NAME, name));
    
+       searchSourceBuilder.fetchSource(false);
+       
+       //오늘추가함
        
        InnerHitBuilder innerHitBuilder = new InnerHitBuilder();
        
-       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().must(QueryBuilders.matchQuery(FIELD_NAME, keyword)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
+       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().should(QueryBuilders.matchQuery(FIELD_NAME, keyword)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
          
        searchRequest.source(searchSourceBuilder);
        System.out.println(searchRequest.source().toString());
@@ -473,6 +479,9 @@ public class PoliticController {
     	   map = hit.getInnerHits();
     	   SearchHits tmp = map.get("dialogue");
     	   for (SearchHit hittmp : tmp) {
+    		   if(hittmp.getScore() <2) {
+    			   continue;
+    		   }
     		   String index = hittmp.getIndex();
     		   String[] temp = index.split("th_")[1].split("round_");
     		   String round = temp[0];
