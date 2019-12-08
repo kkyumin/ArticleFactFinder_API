@@ -6,6 +6,7 @@ import org.factfinder.mapper.PoliticMapper;
 import org.factfinder.vo.AgendaVO;
 import org.factfinder.vo.DialogueVO;
 import org.factfinder.vo.MinuteVO;
+import org.factfinder.vo.PolititionVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -34,4 +35,22 @@ public class PoliticServiceImpl implements PoliticService{
 		log.info("getDialogue of aid: "+ aid);
 		return mapper.getDialogue(aid);
 	}
+//	@Override
+//	public List<PolititionVO> getSubscribe(int uid){
+//		log.info("get Subscribed List of uid: "+ uid);
+//		return mapper.getSubsribe(uid);
+//	}
+//	
+//	@Override
+//	public void setSubscribe(int aid,String pname){
+//		log.info("set Subscribed List of aid: "+ aid, pname);
+//		return mapper.setSubsribe(aid,pname);
+//	}
+//	
+//	@Override
+//	public List<PolititionVO> getPolititionData(String pname){
+//		log.info("get Subscribed List of aid: "+ pname);
+//		return mapper.getPolititionData(pname);
+//	}
+	
 }	
