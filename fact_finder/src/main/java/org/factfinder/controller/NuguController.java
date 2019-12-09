@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.http.HttpHost;
 import org.apache.lucene.search.join.ScoreMode;
 import org.elasticsearch.action.search.SearchRequest;
@@ -28,6 +29,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.AllArgsConstructor;
@@ -192,6 +195,116 @@ public class NuguController {
 	
 	}
 
+		@RequestMapping(value = "/findFact"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+		public String findFact(@RequestBody Map<String, Object> json){
+
+			 Map<String, Object> action =(HashMap<String,Object>) json.get("action");
+		       Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
+		      Map<String, Object> speech = (HashMap<String,Object>) parameters.get("speech");
+		     String value = speech.get("value").toString();
+		     String keyword = value;
+			String INDEX_NAME = "*round*";
+	        //문서 타입
+		  	String TYPE_NAME ="_doc";
+		   String FIELD_NAME = "discussion";
+	       SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+	 
+	       SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+	         
+	    
+	       if(keyword.contains("\"")) {
+	    	   keyword = keyword.replaceAll("\"", "");
+	       }
+	       HighlightBuilder highlightBuilder = new HighlightBuilder();
+	   
+
+	       searchSourceBuilder.query(QueryBuilders.matchQuery("discussion", keyword)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(3).preTags(startEm).postTags(endEm));  
+
+	       searchRequest.source(searchSourceBuilder);
+	       System.out.println(searchRequest.source().toString());
+
+	        SearchResponse searchResponse = null;
+	       try(RestHighLevelClient client = createConnection();){
+	           searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
+	           
+//	           System.out.println(searchResponse.toString());
+	       }catch (Exception e) {
+	           // TODO: handle exception
+	           e.printStackTrace();
+	           return null;
+	      }    
+
+
+	//
+	       Map<String, SearchHits> map= new HashMap<String,SearchHits>();
+
+	       ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
+	  
+		   SearchHits searchHits = searchResponse.getHits();
+		   ObjectMapper oMapper = new ObjectMapper();
+		   // 아직 안하는 중
+
+		   int count =0;
+		   Map<String,Object> outputMap = new HashMap<String,Object>();
+	       
+		   for(SearchHit hit: searchHits) {
+	    	   
+	    	   
+	    	   String index = hit.getIndex();
+			   String[] temp = index.split("th_")[1].split("round_");
+			   String round = temp[0];
+			   String meetingType = temp[1];
+			   String time = hit.getId();
+			   Map<String,Object> sourceMap = new HashMap<String,Object>();
+			   sourceMap.put("round",Integer.parseInt(round));
+			   sourceMap.put("time",Integer.parseInt(time));  
+			   sourceMap.put("meeting_type",meetingType);
+
+			   Text[] highlight =  hit.getHighlightFields().get("discussion").getFragments();
+			   
+			   String highlightString = "";
+			   
+			  
+			   
+			   for(int i =0; i<highlight.length;i++) {
+				   String tmp = highlight[i].toString()+"\n";
+				   highlightString += tmp;
+			   }
+			   highlightString = highlightString.replaceAll(startEm, "");
+			   highlightString = highlightString.replaceAll(endEm, "");
+			   			   
+			   
+			   
+			   Map<String,Object> highlighted = new HashMap<String,Object>();
+			   highlighted.put("discussion",highlightString);
+			   
+			   sourceMap.put("highlight",highlighted);	   
+			   resultArray.add(sourceMap);
+			   
+			   
+			   outputMap.put("findround", round);
+			   outputMap.put("findtime", time);
+			   outputMap.put("finddiscussion", highlightString);
+
+			   break;
+	       }	
+		   
+	       Map<String, Object> resultMap = new HashMap<String,Object>();
+	       resultMap.put("version", "2.0");
+	       resultMap.put("resultCode", "OK");	       
+	       resultMap.put("output", outputMap);
+	       
+
+	       String object = null;
+		   try{
+			   object = new ObjectMapper().writeValueAsString(resultMap);
+			   System.out.println(object);
+		   }catch(Exception e) {
+	       }
+	      
+	   	   return object;
+	       
+		}
 	   	
 	   	
 		@RequestMapping(value = "/getAgendaByName"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
@@ -246,7 +359,7 @@ public class NuguController {
 		   int offset = 0;
 		   
 	       Map<String,Object> resultMap = new HashMap<String,Object>();
-	       
+		   Map<String, Object> finalMap = new HashMap<String,Object>();	       
 		   ArrayList<String> highlightStringResult = new ArrayList<String>();
 	       for(SearchHit hit: searchHits) {
 	    	   String index = hit.getIndex();
@@ -359,10 +472,10 @@ public class NuguController {
 				   }
 				   currentIndex+=1;
 			   }
-			   
-			   
-			   Map<String,Object> realResult = mapList.get(maxIndex);
-			   
+			   Map<String,Object> realResult =null;
+			   if(maxIndex != 0) {
+			   realResult = mapList.get(maxIndex);
+			   }
 			   String index = hit.getIndex();
 			   String[] temp = index.split("th_")[1].split("round_");
 			   int round = Integer.parseInt(temp[0]);
@@ -377,8 +490,6 @@ public class NuguController {
 	    	   
 	       }
 
-	       
-		   Map<String, Object> finalMap = new HashMap<String,Object>();
 		   finalMap.put("version", "2.0");
 		   finalMap.put("resultCode", "OK");
 		   finalMap.put("output", resultMap);
@@ -399,12 +510,8 @@ public class NuguController {
 		public String getAgendaByNameExist(@RequestBody Map<String, Object> input){
 			Map<String, Object> action =(HashMap<String,Object>) input.get("action");
 		    Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
-		    parameters = parameters;
-		    parameters = parameters;
-		    parameters = parameters;
-		    
+		     
 		 
-//	       String value = politicanLists.get("value").toString();
 
 		    String json = null;
 		    try{
@@ -414,7 +521,114 @@ public class NuguController {
 		 	 System.out.println(json);
 		    return json;
 		}
-	   	//	@RequestMapping(value = "/searchAgendaByName"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+		
+		@RequestMapping(value = "/getDiscussion_Want"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+		public String getDiscussionWant(@RequestBody Map<String, Object> input){
+			Map<String, Object> action =(HashMap<String,Object>) input.get("action");
+		    Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
+		    Map<String, Object> result = (HashMap<String,Object>) parameters.get("result");
+		    
+		   
+		    String value = result.get("value").toString();
+		    
+		    value = StringEscapeUtils.unescapeJava(value);
+
+		    value = value.replaceAll("u\'", "\'");
+		    value = value.replaceAll("\'", "\"");
+		    
+		    String temp = value.split("\\[")[1].split("\\]")[0];
+		    String[] tempList = temp.split(",");
+		    
+		    
+		    String resultString = tempList[0];
+		    
+		    if(tempList.length >1)
+		    	resultString += " 그리고 " + tempList[1];
+		    
+		    Map<String,Object> resultMap = new HashMap<String,Object>();
+		   Map<String, Object> finalMap = new HashMap<String,Object>();	       
+
+
+		    resultMap.put("result_discussion",resultString);
+			finalMap.put("version", "2.0");
+			finalMap.put("resultCode", "OK");
+			finalMap.put("output", resultMap);
+		 
+//	       String value = politicanLists.get("value").toString();
+
+		    String json = null;
+		    try{
+				   json = new ObjectMapper().writeValueAsString(finalMap);
+		    System.out.println(json);
+		    }catch(Exception e) {
+		       }
+		 	 System.out.println(json);
+		    return json;
+		}
+
+
+		    
+//		
+//		@RequestMapping(value = "/getAgendaByName_exist"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+//		public String getAgendaByNameExist(@RequestBody Map<String, Object> input){
+//			Map<String, Object> action =(HashMap<String,Object>) input.get("action");
+//		    Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
+//		     
+//		 
+//
+//		    String json = null;
+//		    try{
+//				   json = new ObjectMapper().writeValueAsString(input);
+//		       }catch(Exception e) {
+//		       }
+//		 	 System.out.println(json);
+//		    return json;
+//		}
+//		
+//		@RequestMapping(value = "/getDiscussion_Want"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+//		public String getDiscussionWant(@RequestBody Map<String, Object> input){
+//			Map<String, Object> action =(HashMap<String,Object>) input.get("action");
+//		    Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
+//		    Map<String, Object> result = (HashMap<String,Object>) parameters.get("result");
+//		    
+//		   
+//		    String value = result.get("value").toString();
+//		    
+//		    value = StringEscapeUtils.unescapeJava(value);
+//
+//		    value = value.replaceAll("u\'", "\'");
+//		    value = value.replaceAll("\'", "\"");
+//		    
+//		    String temp = value.split("[")[1].split("]")[0];
+//		    String[] tempList = temp.split(",");
+//		    
+//		    
+//		    String resultString = tempList[0];
+//		    
+//		    if(tempList.length >1)
+//		    	resultString += " 그리고 " + tempList[1];
+//		    
+//		    Map<String,Object> resultMap = new HashMap<String,Object>();
+//		   Map<String, Object> finalMap = new HashMap<String,Object>();	       
+//
+//
+//		    resultMap.put("result_discussion",resultString);
+//			finalMap.put("version", "2.0");
+//			finalMap.put("resultCode", "OK");
+//			finalMap.put("output", resultMap);
+//		 
+////	       String value = politicanLists.get("value").toString();
+//
+//		    String json = null;
+//		    try{
+//				   json = new ObjectMapper().writeValueAsString(finalMap);
+//		    System.out.println(json);
+//		    }catch(Exception e) {
+//		       }
+//		 	 System.out.println(json);
+//		    return json;
+//		}
+		//	@RequestMapping(value = "/searchAgendaByName"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
 //	public String searchAgendaByName(@RequestBody Map<String, Object> json){
 //		
 //       log.info(json);
@@ -637,5 +851,5 @@ public class NuguController {
 //   	   return json;
 //       
 //	}
-    
+		
 }
