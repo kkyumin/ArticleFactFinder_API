@@ -42,6 +42,10 @@ public class NuguController {
 
 	public static ArrayList<String> politicianList= new ArrayList<String>();
 	
+    private static final String startEm = "<strong>"; 
+    private static final String endEm = "</strong>";    
+
+    
     public RestHighLevelClient createConnection() {
         return new RestHighLevelClient(
                     RestClient.builder(
@@ -187,152 +191,379 @@ public class NuguController {
 
 	
 	}
-	@RequestMapping(value = "/searchAgendaByName"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
-	public String searchAgendaByName(@RequestBody Map<String, Object> json){
+
+	   	
+	   	
+		@RequestMapping(value = "/getAgendaByName"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+		public String getAgendaByName(@RequestBody Map<String, Object> input){
+
+			Map<String, Object> action =(HashMap<String,Object>) input.get("action");
+		    Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
+		    Map<String, Object> subscribe_name = (HashMap<String,Object>) parameters.get("politician_name");
+		    String politician_name = subscribe_name.get("value").toString();			
+			String INDEX_NAME = "*th_37*";	
+	        //문서 타입
+
+	       SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+	 
+	       SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+	         
+	    
+	       if(politician_name.contains("\"")) {
+	    	   politician_name = politician_name.replaceAll("\"", "");
+	       }
+	       
+	       HighlightBuilder highlightBuilder = new HighlightBuilder();
+	       
+	       searchSourceBuilder.query(QueryBuilders.termQuery("discussion", politician_name)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(10).preTags(startEm).postTags(endEm));         
+	       searchRequest.source(searchSourceBuilder);
+	       System.out.println(searchRequest.source().toString());
+
+	        SearchResponse searchResponse = null;
+	       try(RestHighLevelClient client = createConnection();){
+	           searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);    
+//	           System.out.println(searchResponse.toString());
+	       }catch (Exception e) {
+	           // TODO: handle exception
+	           e.printStackTrace();
+	           return null;
+	      }    
+
+
+	       String json =null;
+	//
+	       Map<String, SearchHits> map= new HashMap<String,SearchHits>();
+
+	       ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
+	  
+		   SearchHits searchHits = searchResponse.getHits();
+		   ObjectMapper oMapper = new ObjectMapper();
+		   // 아직 안하는 중
+		   
+		   int maxRound = 0;
+		   int maxTime = 0;
+		   int count = 0;
+		   int offset = 0;
+		   
+	       Map<String,Object> resultMap = new HashMap<String,Object>();
+	       
+		   ArrayList<String> highlightStringResult = new ArrayList<String>();
+	       for(SearchHit hit: searchHits) {
+	    	   String index = hit.getIndex();
+			   String[] temp = index.split("th_")[1].split("round_");
+			   int round = Integer.parseInt(temp[0]);
+			   int time = Integer.parseInt(hit.getId());
+			   boolean speechFlag = false;
+			   
+			   ArrayList<String> highlightStringList = new ArrayList<String>();
+			   Text[] highlight =  hit.getHighlightFields().get("discussion").getFragments();
+			   for(int i =0; i<highlight.length;i++) {
+				   String highlightString = highlight[i].toString();
+				   highlightString = highlightString.replaceAll(startEm, "");
+				   highlightString = highlightString.replaceAll(endEm, "");
+				   String[] highlightStringTmp = highlightString.split(" ");
+				   for(int j =0; j<2;j++) {
+					   if(highlightStringTmp[j].contains(politician_name)) {
+						   speechFlag = true;
+						   highlightStringList.add(highlightString);
+						   break;
+					   }	   
+				   }
+			   }
+			   
+			   if(speechFlag == true) {
+				   if(maxRound < round) {
+					   maxRound = round;
+					   maxTime = time;
+					   offset = count;
+					   highlightStringResult.clear();
+					   highlightStringResult = (ArrayList<String>) highlightStringList.clone();
+				   }
+				   
+				   if(maxTime<time && maxRound == round) {
+					   
+					   maxTime= time;
+					   offset = count;
+					   highlightStringResult.clear();
+					   highlightStringResult = (ArrayList<String>) highlightStringList.clone();
+				   }
+			   }
+
+			   
+			   count+=1;
+	      }
+			
+	   
+	       count = 0;
+	       
+	       for(SearchHit hit: searchHits) {
+	    	   if(offset!= count) {
+	    		   count+=1;
+	    		   continue;
+	    	   }
+	    	   else {
+			   Map<String,Object> sourceMap = hit.getSourceAsMap();
+			   ArrayList<String> discussion = (ArrayList<String>) sourceMap.get("discussion");
+			   ArrayList<String> agenda = (ArrayList<String>) sourceMap.get("agenda");
+			   ArrayList<Integer> indexList = new ArrayList<Integer>();
+
+			   ArrayList<Map<String,Object>> mapList = new ArrayList<Map<String,Object>>();
+			   
+			  
+			   
 		
-       log.info(json);
-       
-       Map<String, Object> action =(HashMap<String,Object>) json.get("action");
-       
-       Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
-       
-       Map<String, Object> agendaName = (HashMap<String,Object>) action.get("agenda_name");
-       
-       Map<String, Object> politician_name = (HashMap<String,Object>) action.get("politician_name");       
+			   for(String elemInhighLight : highlightStringResult) {
+				   Map<String,Object> result = new HashMap<String,Object>();
+				   int count2 = 0;
+				   for(String eachDiscussion : discussion) {
+					   if(eachDiscussion.contains(elemInhighLight)) {
+						
+						   String agendaFetched = agenda.get(count2);
+						   int flag = 0;
+						   for(Map<String,Object> mapIter : mapList) {
+							   if(mapIter.containsValue(agendaFetched)) {
+								   flag = 1;
+								   ArrayList<String> tmpArrayList= (ArrayList<String>) mapIter.get("highlight");
+								    
+								   tmpArrayList.add(elemInhighLight);
+								   mapIter.put("highlight", tmpArrayList);
+								   mapIter.put("discussionCount", ((int) mapIter.get("discussionCount") +1));
+								   break;
+							   }
+						   }
+							   
+						   if(flag == 0) {
+						   result.put("agenda",agenda.get(count2));
+						   ArrayList<String> tmpArrayList = new ArrayList<String>();
+						   tmpArrayList.add(elemInhighLight);
+						   result.put("highlight",tmpArrayList);
+						   result.put("discussionCount",1);
+						   mapList.add(result);
+						   }
+						   
 
-       String value = action.get("value").toString();
+						   break;
+					   }
+					   count2 +=1;
+				   }
 
-	   String INDEX_NAME = "*round_plenary_session";
-        //문서 타입
-	   
-	   
-      SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+			   }
 
-      SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        
-   
-      if(value.contains("\"")) {
-    	  value = value.replaceAll("\"", "");
-      }
-      
-      HighlightBuilder highlightBuilder = new HighlightBuilder();
-      searchSourceBuilder.query(QueryBuilders.matchQuery("discussion", value)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(1));  
-      searchRequest.source(searchSourceBuilder);
-      System.out.println(searchRequest.source().toString());
+			   int maxDiscussionCount = 0;
+			   int maxIndex = 0;
+			   int currentIndex = 0;
+			   for(Map<String,Object> objIter: mapList) {
+				   if( (int)objIter.get("discussionCount") > maxDiscussionCount) {
+					   maxDiscussionCount = (int)objIter.get("discussionCount");
+					   maxIndex = currentIndex;
+				   }
+				   currentIndex+=1;
+			   }
+			   
+			   
+			   Map<String,Object> realResult = mapList.get(maxIndex);
+			   
+			   String index = hit.getIndex();
+			   String[] temp = index.split("th_")[1].split("round_");
+			   int round = Integer.parseInt(temp[0]);
+			   int time = Integer.parseInt(hit.getId());
+	
+			   resultMap.put("result_agenda", realResult.get("agenda").toString());
+			   resultMap.put("round",round);
+			   resultMap.put("time",time);
+			   resultMap.put("result",realResult);
+			   break;
+	    	   }
+	    	   
+	       }
 
-       SearchResponse searchResponse = null;
-      try(RestHighLevelClient client = createConnection();){
-          searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);    
-//          System.out.println(searchResponse.toString());
-      }catch (Exception e) {
-          // TODO: handle exception
-          e.printStackTrace();
-          return null;
-     }    
+	       
+		   Map<String, Object> finalMap = new HashMap<String,Object>();
+		   finalMap.put("version", "2.0");
+		   finalMap.put("resultCode", "OK");
+		   finalMap.put("output", resultMap);
+		       
+	      try{
+			   json = new ObjectMapper().writeValueAsString(finalMap);
+			   System.out.println(json);
+	       }catch(Exception e) {
+	       }
+	      
+	   	   return json;
+	       
+		}
 
+
+
+		@RequestMapping(value = "/getAgendaByName_exist"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+		public String getAgendaByNameExist(@RequestBody Map<String, Object> input){
+			Map<String, Object> action =(HashMap<String,Object>) input.get("action");
+		    Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
+		    parameters = parameters;
+		    parameters = parameters;
+		    parameters = parameters;
+		    
+		 
+//	       String value = politicanLists.get("value").toString();
+
+		    String json = null;
+		    try{
+				   json = new ObjectMapper().writeValueAsString(input);
+		       }catch(Exception e) {
+		       }
+		 	 System.out.println(json);
+		    return json;
+		}
+	   	//	@RequestMapping(value = "/searchAgendaByName"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
+//	public String searchAgendaByName(@RequestBody Map<String, Object> json){
+//		
+//       log.info(json);
+//       
+//       Map<String, Object> action =(HashMap<String,Object>) json.get("action");
+//       
+//       Map<String, Object> parameters = (HashMap<String,Object>) action.get("parameters");
+//       
+//       Map<String, Object> agendaName = (HashMap<String,Object>) action.get("agenda_name");
+//       
+//       Map<String, Object> politician_name = (HashMap<String,Object>) action.get("politician_name");       
 //
-//      String json =null;
+//       String value = action.get("value").toString();
 //
-      Map<String, SearchHits> map= new HashMap<String,SearchHits>();
-
-      ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
- 
-	   SearchHits searchHits = searchResponse.getHits();
-	   ObjectMapper oMapper = new ObjectMapper();
-	   // 아직 안하는 중
-
-      
-	   
-	   
-      for(SearchHit hit: searchHits) {
-   	   
-   	   
-   	   String index = hit.getIndex();
-		   String[] temp = index.split("th_")[1].split("round_");
-		   String round = temp[0];
-		   String meetingType = temp[1];
-		   String time = hit.getId();
-		   Map<String,Object> sourceMap = new HashMap<String,Object>();
-		   sourceMap.put("round",Integer.parseInt(round));
-		   sourceMap.put("time",Integer.parseInt(time));  
-		   sourceMap.put("meeting_type",meetingType);
-
-		   Text[] highlight =  hit.getHighlightFields().get("agenda").getFragments();
-		   String highlightString = highlight[0].toString();
-//		   highlightString = highlightString.replaceAll(startEm, "");
-//		   highlightString = highlightString.replaceAll(endEm, "");
-//		   
-		   
-		   
-		   Map<String,Object> highlighted = new HashMap<String,Object>();
-		   highlighted.put("agenda",highlightString);
-		   
-		   sourceMap.put("highlight",highlighted);	   
-		   resultArray.add(sourceMap);
-      }	
-      
-      
-      Map<String,Object> resultMap = new HashMap<String,Object>();
-      resultMap.put("result", resultArray);
-             
-       
-       
-//       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().should(QueryBuilders.matchQuery(FIELD_NAME, name)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
-//         
-//       searchRequest.source(searchSourceBuilder);
-//       System.out.println(searchRequest.source().toString());
+//	   String INDEX_NAME = "*round_plenary_session";
+//        //문서 타입
+//	   
+//	   
+//      SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
 //
-//        SearchResponse searchResponse = null;
-//       try(RestHighLevelClient client = createConnection();){
-//           searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
-//           
+//      SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+//        
+//   
+//      if(value.contains("\"")) {
+//    	  value = value.replaceAll("\"", "");
+//      }
+//      
+//      HighlightBuilder highlightBuilder = new HighlightBuilder();
+//      searchSourceBuilder.query(QueryBuilders.matchQuery("discussion", value)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(1));  
+//      searchRequest.source(searchSourceBuilder);
+//      System.out.println(searchRequest.source().toString());
 //
-//        }catch (Exception e) {
-//           // TODO: handle exception
-//           e.printStackTrace();
-//           return null;
-//      }    
+//       SearchResponse searchResponse = null;
+//      try(RestHighLevelClient client = createConnection();){
+//          searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);    
+////          System.out.println(searchResponse.toString());
+//      }catch (Exception e) {
+//          // TODO: handle exception
+//          e.printStackTrace();
+//          return null;
+//     }    
 //
-//       String json =null;
 ////
-//       Map<String, SearchHits> map= new HashMap<String,SearchHits>();
+////      String json =null;
+////
+//      Map<String, SearchHits> map= new HashMap<String,SearchHits>();
 //
-//       ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
-//  
+//      ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
+// 
 //	   SearchHits searchHits = searchResponse.getHits();
 //	   ObjectMapper oMapper = new ObjectMapper();
 //	   // 아직 안하는 중
 //
-//       
-//       for(SearchHit hit: searchHits) {
-//    	   map = hit.getInnerHits();
-//    	   SearchHits tmp = map.get("dialogue");
-//    	   for (SearchHit hittmp : tmp) {
-//    		   if(hittmp.getScore() <1) {
-//    			   continue;
-//    		   }
-//    		   String index = hittmp.getIndex();
-//    		   String[] temp = index.split("th_")[1].split("round_");
-//    		   String round = temp[0];
-//    		   String time = hittmp.getId();
-//   
-//    		   Map<String,Object> sourceMap = new HashMap<String,Object>();
-//    		   sourceMap.put("round",Integer.parseInt(round));
-//    		   sourceMap.put("time",Integer.parseInt(time));  
-//    		   resultArray.add(sourceMap); 		   
-//    	   }
-//       }	
-//       
-//       Map<String,Object> resultMap = new HashMap<String,Object>();
-//       resultMap.put("result", resultArray);
-//	   try{
-//		   json = new ObjectMapper().writeValueAsString(resultMap);
-//       }catch(Exception e) {
-//       }
 //      
-//   	   return json;
-       return null;
-	}
+//	   
+//	   
+//      for(SearchHit hit: searchHits) {
+//   	   
+//   	   
+//   	   String index = hit.getIndex();
+//		   String[] temp = index.split("th_")[1].split("round_");
+//		   String round = temp[0];
+//		   String meetingType = temp[1];
+//		   String time = hit.getId();
+//		   Map<String,Object> sourceMap = new HashMap<String,Object>();
+//		   sourceMap.put("round",Integer.parseInt(round));
+//		   sourceMap.put("time",Integer.parseInt(time));  
+//		   sourceMap.put("meeting_type",meetingType);
+//
+//		   Text[] highlight =  hit.getHighlightFields().get("agenda").getFragments();
+//		   String highlightString = highlight[0].toString();
+////		   highlightString = highlightString.replaceAll(startEm, "");
+////		   highlightString = highlightString.replaceAll(endEm, "");
+////		   
+//		   
+//		   
+//		   Map<String,Object> highlighted = new HashMap<String,Object>();
+//		   highlighted.put("agenda",highlightString);
+//		   
+//		   sourceMap.put("highlight",highlighted);	   
+//		   resultArray.add(sourceMap);
+//      }	
+//      
+//      
+//      Map<String,Object> resultMap = new HashMap<String,Object>();
+//      resultMap.put("result", resultArray);
+//             
+//      
+//      
+//      
+//      
+//       
+//       
+////       searchSourceBuilder.query(QueryBuilders.nestedQuery("dialogue", QueryBuilders.boolQuery().should(QueryBuilders.matchQuery(FIELD_NAME, name)), ScoreMode.Avg).innerHit(innerHitBuilder.setTrackScores(true)));
+////         
+////       searchRequest.source(searchSourceBuilder);
+////       System.out.println(searchRequest.source().toString());
+////
+////        SearchResponse searchResponse = null;
+////       try(RestHighLevelClient client = createConnection();){
+////           searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
+////           
+////
+////        }catch (Exception e) {
+////           // TODO: handle exception
+////           e.printStackTrace();
+////           return null;
+////      }    
+////
+////       String json =null;
+//////
+////       Map<String, SearchHits> map= new HashMap<String,SearchHits>();
+////
+////       ArrayList<Map<String,Object>> resultArray = new ArrayList<Map<String,Object>>();
+////  
+////	   SearchHits searchHits = searchResponse.getHits();
+////	   ObjectMapper oMapper = new ObjectMapper();
+////	   // 아직 안하는 중
+////
+////       
+////       for(SearchHit hit: searchHits) {
+////    	   map = hit.getInnerHits();
+////    	   SearchHits tmp = map.get("dialogue");
+////    	   for (SearchHit hittmp : tmp) {
+////    		   if(hittmp.getScore() <1) {
+////    			   continue;
+////    		   }
+////    		   String index = hittmp.getIndex();
+////    		   String[] temp = index.split("th_")[1].split("round_");
+////    		   String round = temp[0];
+////    		   String time = hittmp.getId();
+////   
+////    		   Map<String,Object> sourceMap = new HashMap<String,Object>();
+////    		   sourceMap.put("round",Integer.parseInt(round));
+////    		   sourceMap.put("time",Integer.parseInt(time));  
+////    		   resultArray.add(sourceMap); 		   
+////    	   }
+////       }	
+////       
+////       Map<String,Object> resultMap = new HashMap<String,Object>();
+////       resultMap.put("result", resultArray);
+////	   try{
+////		   json = new ObjectMapper().writeValueAsString(resultMap);
+////       }catch(Exception e) {
+////       }
+////      
+////   	   return json;
+//       return null;
+//	}
 
     
 

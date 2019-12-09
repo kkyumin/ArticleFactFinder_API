@@ -70,8 +70,8 @@ public class PoliticController {
          );
     }	
     
-    private static final String startEm = "<em>"; 
-    private static final String endEm = "</em>";    
+    private static final String startEm = "<strong>"; 
+    private static final String endEm = "</strong>";    
 	@GetMapping(value = "/test")
 //    public Map<String,Object> test() {
 	public String test() {
@@ -155,6 +155,7 @@ public class PoliticController {
             SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
             searchSourceBuilder.fetchSource(false);
             searchRequest.source(searchSourceBuilder);
+ 	       System.out.println(searchRequest.source().toString());
 	        SearchResponse searchResponse = client.search(searchRequest,RequestOptions.DEFAULT);
 	        
 	        SearchHits searchHits = searchResponse.getHits();
@@ -420,10 +421,10 @@ public class PoliticController {
        }
        HighlightBuilder highlightBuilder = new HighlightBuilder();
        if(is_name == true) {
-    	   searchSourceBuilder.query(QueryBuilders.termQuery("discussion", keyword)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(3));  
+    	   searchSourceBuilder.query(QueryBuilders.termQuery("discussion", keyword)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(3).preTags(startEm).postTags(endEm));  
        }
        else {
-       searchSourceBuilder.query(QueryBuilders.matchQuery("discussion", keyword)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(3));  
+       searchSourceBuilder.query(QueryBuilders.matchQuery("discussion", keyword)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(3).preTags(startEm).postTags(endEm));  
        }
        searchRequest.source(searchSourceBuilder);
        System.out.println(searchRequest.source().toString());
@@ -593,10 +594,10 @@ public class PoliticController {
        HighlightBuilder highlightBuilder = new HighlightBuilder();
        
        if(is_name == true){
-           searchSourceBuilder.query(QueryBuilders.termQuery("agenda", keyword)).highlighter(highlightBuilder.field("agenda").order("score").numOfFragments(5));  
+           searchSourceBuilder.query(QueryBuilders.termQuery("agenda", keyword)).highlighter(highlightBuilder.field("agenda").order("score").numOfFragments(5).preTags(startEm).postTags(endEm));  
        }
        
-       searchSourceBuilder.query(QueryBuilders.matchQuery("agenda", keyword)).highlighter(highlightBuilder.field("agenda").order("score").numOfFragments(5));  
+       searchSourceBuilder.query(QueryBuilders.matchQuery("agenda", keyword)).highlighter(highlightBuilder.field("agenda").order("score").numOfFragments(5).preTags(startEm).postTags(endEm));  
        searchRequest.source(searchSourceBuilder);
        System.out.println(searchRequest.source().toString());
 
@@ -752,7 +753,7 @@ public class PoliticController {
 	
 	@RequestMapping(value = "/searchAgendaTest"  , produces = {MediaType.APPLICATION_JSON_UTF8_VALUE})
 	public String searchAgendaTest(@RequestParam("keyword") String keyword){
-		String INDEX_NAME = "*th_34*";
+		String INDEX_NAME = "*th_37*";
         //문서 타입
 
        SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
@@ -766,7 +767,7 @@ public class PoliticController {
        
        HighlightBuilder highlightBuilder = new HighlightBuilder();
        
-       searchSourceBuilder.query(QueryBuilders.termQuery("discussion", keyword)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(5));         
+       searchSourceBuilder.query(QueryBuilders.termQuery("discussion", keyword)).highlighter(highlightBuilder.field("discussion").order("score").numOfFragments(10).preTags(startEm).postTags(endEm));         
        searchRequest.source(searchSourceBuilder);
        System.out.println(searchRequest.source().toString());
 
@@ -868,9 +869,31 @@ public class PoliticController {
 			   int count2 = 0;
 			   for(String eachDiscussion : discussion) {
 				   if(eachDiscussion.contains(elemInhighLight)) {
-					   result.put("highlight",elemInhighLight);
+					
+					   String agendaFetched = agenda.get(count2);
+					   int flag = 0;
+					   for(Map<String,Object> mapIter : mapList) {
+						   if(mapIter.containsValue(agendaFetched)) {
+							   flag = 1;
+							   ArrayList<String> tmpArrayList= (ArrayList<String>) mapIter.get("highlight");
+							    
+							   tmpArrayList.add(elemInhighLight);
+							   mapIter.put("highlight", tmpArrayList);
+							   mapIter.put("discussionCount", ((int) mapIter.get("discussionCount") +1));
+							   break;
+						   }
+					   }
+						   
+					   if(flag == 0) {
 					   result.put("agenda",agenda.get(count2));
+					   ArrayList<String> tmpArrayList = new ArrayList<String>();
+					   tmpArrayList.add(elemInhighLight);
+					   result.put("highlight",tmpArrayList);
+					   result.put("discussionCount",1);
 					   mapList.add(result);
+					   }
+					   
+
 					   break;
 				   }
 				   count2 +=1;
@@ -878,13 +901,27 @@ public class PoliticController {
 
 		   }
 
+		   int maxDiscussionCount = 0;
+		   int maxIndex = 0;
+		   int currentIndex = 0;
+		   for(Map<String,Object> objIter: mapList) {
+			   if( (int)objIter.get("discussionCount") > maxDiscussionCount) {
+				   maxDiscussionCount = (int)objIter.get("discussionCount");
+				   maxIndex = currentIndex;
+			   }
+			   currentIndex+=1;
+		   }
+		   
+		   
+		   Map<String,Object> realResult = mapList.get(maxIndex);
+		   
 		   String index = hit.getIndex();
 		   String[] temp = index.split("th_")[1].split("round_");
 		   int round = Integer.parseInt(temp[0]);
 		   int time = Integer.parseInt(hit.getId());
 		   resultMap.put("round",round);
 		   resultMap.put("time",time);
-		   resultMap.put("result",mapList);
+		   resultMap.put("result",realResult);
 		   break;
     	   }
     	   
