@@ -10,3 +10,5 @@
 
 **ElasticSearch**를 이용하여 발언을 검색할 수 있게 하였다. **ElasticSearch**를 이용한다면 문장의 Variation에 대해 대처할 수 있을 것이라 판단하였다. BackEnd API는 **Spring**을, Frontend는 **Vue.js**를 사용하였다. 추가적으로 인공지능 스피커에도 해당하는 서비스를 붙여놨는데 이는 아직 테스트 단계이다.
 
+## 시연영상
+[바로 가기] (https://www.youtube.com/watch?v=rt-4Jra8jes).
